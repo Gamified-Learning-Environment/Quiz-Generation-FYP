@@ -1,6 +1,12 @@
 #FYP - Results Tracking Repository
 This is the repository for handling the quiz generation within my Gamified Learning Environment. Quizzes will be crated using pre-built datasets and/or generative AI, adapting to a student’s particular needs based on user inputs such as topic and difficulty level. This will largely be the backend of the system.
 
+### Contains: 
+Logic for quiz generation from static data and the integration with AI (e.g., GPT-4, Claude) using prompt engineering.
+### Technologies: 
+Python (Flask/FastAPI), OpenAI API, MongoDB (for storing quiz data).
+
+### Project Proposal Excerpt: 
 Backend:
 • Python with Flask/FastAPI: Chosen for its simplicity and efficiency in developing RESTful APIs and 
 microservices. Research will have to be done to decide on which. 

@@ -1,4 +1,4 @@
-# FYP - Results Tracking Repository
+# FYP - Quiz Generation Repository
 This is the repository for handling the quiz generation within my Gamified Learning Environment. Quizzes will be crated using pre-built datasets and/or generative AI, adapting to a student’s particular needs based on user inputs such as topic and difficulty level. This will largely be the backend of the system.
 
 ### Contains: 

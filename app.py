@@ -1,8 +1,8 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS # import CORS for cross origin resource sharing
-import json
 import db
 from models.quizModel import createQuiz, getQuiz
+from bson import ObjectId
 
 app = Flask(__name__)
 
@@ -34,6 +34,7 @@ def createNewQuiz():
 
 @app.route('/api/quiz/<quizID>', methods=['GET'])
 def getQuizByID(quizID):
+    print(quizID)
     quiz = getQuiz(quizID)
     if(quiz):
         return jsonify(quiz)

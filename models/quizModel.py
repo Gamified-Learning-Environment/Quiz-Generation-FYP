@@ -1,4 +1,3 @@
-from db import db
 from datetime import datetime
 
 class Quiz: 
@@ -11,16 +10,34 @@ class Quiz:
     def to_dict(self): # Convert the object to a dictionary
         return {
             'title': self.title,
-            'questions': self.questions,
+            'questions': [
+                {
+                    'id': question['id'],
+                    'question': question['question'],
+                    'options': question['options'],
+                    'correctAnswer': question['correctAnswer']
+                } for question in self.questions
+            ],
             'created_at': self.created_at
         }
 def createQuiz(quizData):
+    from db import quizdb
     quiz = Quiz(
         title = quizData['title'], 
         questions = quizData['questions']
     )
-    db.quizcollection.insert_one(quiz.to_dict())
-    return {'message': 'Quiz created successfully!' + quizData['title'] + ' ' + quizData['questions']}
+    result = quizdb.quizcollection.insert_one(quiz.to_dict())
+    quizID = str(result.inserted_id)
+    return {'message': ' QuizID: ' + quizID,
+        'quiz_id': quizID,
+        'title': quizData['title'],
+        'questions': str(quizData['questions'])
+    }
 
 def getQuiz(quizID):
-    return db.quizcollection.find_one({'_id': quizID})
+    from db import quizdb
+    from bson import ObjectId
+    quiz = quizdb.quizcollection.find_one({'_id': ObjectId(quizID)})
+    if quiz:
+        quiz['_id'] = str(quiz['_id'])  # Convert ObjectId to string
+    return quiz

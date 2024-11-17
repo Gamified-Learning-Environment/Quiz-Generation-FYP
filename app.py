@@ -21,17 +21,22 @@ def home():
     print("successful connection to Quiz Service")
     return "Quiz Service"
 
-@app.route('/data', methods=['GET'])
-def get_data():
+@app.route('/data', methods=['POST'])
+def insert_data():
     db.db.collection.insert_one(data)
     return jsonify("Data inserted successfully" + str(data))
 
+# Create a new quiz using POST method and return the quizID in the response
 @app.route('/api/quiz', methods=['POST'])
 def createNewQuiz():
     quizData = request.json
     quizResponse = createQuiz(quizData)
-    return jsonify("Message: Quiz created successfully" + quizResponse['message']), 201
+    return jsonify({
+        "message": "Quiz created successfully", 
+        "quizid": quizResponse['quiz_id']
+    }), 201
 
+# Get a quiz by quizID using GET method and return the quiz in the response
 @app.route('/api/quiz/<quizID>', methods=['GET'])
 def getQuizByID(quizID):
     print(quizID)

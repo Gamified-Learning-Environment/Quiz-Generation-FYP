@@ -2,14 +2,16 @@ from datetime import datetime
 
 class Quiz: 
     # constructor
-    def __init__(self, title, questions): # Self is a reference to current instance, title and questions are parameters
+    def __init__(self, title, description, questions): # Self is a reference to current instance, title and questions are parameters
         self.title = title
+        self.description = description
         self.questions = questions
         self.created_at = datetime.now()
 
     def to_dict(self): # Convert the object to a dictionary
         return {
             'title': self.title,
+            'description': self.description,
             'questions': [
                 {
                     'id': question['id'],
@@ -24,6 +26,7 @@ def createQuiz(quizData):
     from db import quizdb
     quiz = Quiz(
         title = quizData['title'], 
+        description = quizData['description'],
         questions = quizData['questions']
     )
     result = quizdb.quizcollection.insert_one(quiz.to_dict())
@@ -31,6 +34,7 @@ def createQuiz(quizData):
     return {'message': ' QuizID: ' + quizID,
         'quiz_id': quizID,
         'title': quizData['title'],
+        'description': quizData['description'],
         'questions': str(quizData['questions'])
     }
 

@@ -22,6 +22,7 @@ class Quiz:
             ],
             'created_at': self.created_at
         }
+# create a new quiz using the quizData
 def createQuiz(quizData):
     from db import quizdb
     quiz = Quiz(
@@ -29,7 +30,10 @@ def createQuiz(quizData):
         description = quizData['description'],
         questions = quizData['questions']
     )
+    # Insert the quiz into the database
     result = quizdb.quizcollection.insert_one(quiz.to_dict())
+    
+    # convert the ObjectId to string and return the quiz
     quizID = str(result.inserted_id)
     return {'message': ' QuizID: ' + quizID,
         'quiz_id': quizID,
@@ -38,6 +42,7 @@ def createQuiz(quizData):
         'questions': str(quizData['questions'])
     }
 
+# get a quiz by quizID
 def getQuiz(quizID):
     from db import quizdb
     from bson import ObjectId
@@ -45,3 +50,33 @@ def getQuiz(quizID):
     if quiz:
         quiz['_id'] = str(quiz['_id'])  # Convert ObjectId to string
     return quiz
+
+# get all quizzes
+def getAll():
+    from db import quizdb
+    quizzes = quizdb.quizcollection.find()
+    quiz_list = []
+    for quiz in quizzes:
+        quiz['_id'] = str(quiz['_id'])  # Convert ObjectId to string
+        quiz_list.append(quiz)
+    return quiz_list
+
+# update a quiz by quizID
+def updateQuiz(quizID, quizData):
+    from db import quizdb
+    from bson import ObjectId
+    quiz = quizdb.quizcollection.find_one({'_id': ObjectId(quizID)})
+    if quiz:
+        quizdb.quizcollection.update_one({'_id': ObjectId(quizID)}, {'$set': quizData})
+        return {'message': 'Quiz updated successfully'}
+    return {'message': 'Error: Quiz not found'}
+
+# delete a quiz by quizID
+def deleteQuiz(quizID):
+    from db import quizdb
+    from bson import ObjectId
+    quiz = quizdb.quizcollection.find_one({'_id': ObjectId(quizID)})
+    if quiz:
+        quizdb.quizcollection.delete_one({'_id': ObjectId(quizID)})
+        return {'message': 'Quiz deleted successfully'}
+    return {'message': 'Error: Quiz not found'}

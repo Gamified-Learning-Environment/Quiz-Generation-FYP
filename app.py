@@ -28,6 +28,16 @@ def insert_data():
     return jsonify("Data inserted successfully" + str(data))
 
 # Create a new quiz using POST method and return the quizID in the response
+#@app.route('/api/quiz', methods=['POST'])
+#def createNewQuiz():
+#    quizData = request.json
+#    quizResponse = createQuiz(quizData)
+#    return jsonify({
+#        "message": "Quiz created successfully",
+#        "quizid": quizResponse['quiz_id']
+#    }), 201
+
+# create quiz modified
 @app.route('/api/quiz', methods=['POST'])
 def createNewQuiz():
     quizData = request.json
@@ -47,9 +57,16 @@ def getQuizByID(quizID):
     return jsonify("Error: Quiz not found"), 404
 
 # Get all quizzes using GET method and return the quizzes in the response
+#@app.route('/api/quizzes', methods=['GET'])
+#def getAllQuizzes():
+#    quizzes = getAll()
+#    return jsonify(quizzes)
+
+# get all quizzes modified
 @app.route('/api/quizzes', methods=['GET'])
 def getAllQuizzes():
-    quizzes = getAll()
+    userId = request.args.get('userId')
+    quizzes = getAll(userId)
     return jsonify(quizzes)
 
 # Update a quiz by quizID using PUT method and return the response

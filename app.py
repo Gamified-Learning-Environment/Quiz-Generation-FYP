@@ -6,7 +6,11 @@ from models.quizModel import createQuiz, getQuiz, getAll, updateQuiz, deleteQuiz
 from bson import ObjectId
 from datetime import datetime
 import os
-from config import MONGODB_URI, OPENAI_API_KEY
+from dotenv import load_dotenv
+load_dotenv()
+
+MONGODB_URI = os.environ.get('MONGODB_URI')
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 
 app = Flask(__name__)
 

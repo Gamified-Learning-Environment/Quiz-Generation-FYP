@@ -61,7 +61,8 @@ def createQuiz(quizData):
         'quiz_id': quizID,
         'title': quizData['title'],
         'description': quizData['description'],
-        'questions': str(quizData['questions'])
+        'questions': str(quizData['questions']),
+        #'created_at': quizData['created_at']
     }
 
 # get a quiz by quizID

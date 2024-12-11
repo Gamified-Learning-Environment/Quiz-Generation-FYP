@@ -1,18 +1,24 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS # import CORS for cross origin resource sharing
-import db
-from openai import OpenAI
-from models.quizModel import createQuiz, getQuiz, getAll, updateQuiz, deleteQuiz
-from bson import ObjectId
+from flask_cors import CORS # import CORS
+import db # import db
+from openai import OpenAI # import OpenAI class
+from models.quizModel import createQuiz, getQuiz, getAll, updateQuiz, deleteQuiz # import functions from models.quizModel
+from bson import ObjectId 
 from datetime import datetime
 import os
-from dotenv import load_dotenv
-load_dotenv()
+from dotenv import load_dotenv 
 
+# For PDF parsing
+import PyPDF2
+import requests
+import io
+
+# load environment variables from .env file
+load_dotenv()
 MONGODB_URI = os.environ.get('MONGODB_URI')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 
-app = Flask(__name__)
+app = Flask(__name__) # create instance of Flask
 
 # Configure CORS properly
 CORS(app, 
@@ -23,7 +29,7 @@ CORS(app,
      }},
      supports_credentials=True)
 
-client = OpenAI(
+client = OpenAI( # create instance of OpenAI
     api_key=OPENAI_API_KEY
 )
 
@@ -34,27 +40,19 @@ data = {
     "city": "New York"
 }
 
-@app.route('/')  # route() decorator to tell Flask what URL should trigger the function
+# test route
+@app.route('/')  
 def home():
     print("successful connection to Quiz Service")
     return "Quiz Service"
 
+# test route with data
 @app.route('/data', methods=['POST'])
 def insert_data():
     db.db.collection.insert_one(data)
     return jsonify("Data inserted successfully" + str(data))
 
 # Create a new quiz using POST method and return the quizID in the response
-#@app.route('/api/quiz', methods=['POST'])
-#def createNewQuiz():
-#    quizData = request.json
-#    quizResponse = createQuiz(quizData)
-#    return jsonify({
-#        "message": "Quiz created successfully",
-#        "quizid": quizResponse['quiz_id']
-#    }), 201
-
-# create quiz modified
 @app.route('/api/quiz', methods=['POST'])
 def createNewQuiz():
     quizData = request.json
@@ -95,7 +93,7 @@ def updateQuizByID(quizID):
 def deleteQuizByID(quizID):
     quiz = getQuiz(quizID)
     if(quiz):
-        db.quizdb.quizcollection.delete_one({'_id': ObjectId(quizID)})
+        deleteQuiz(quizID)
         return jsonify("Quiz deleted successfully")
     return jsonify("Error: Quiz not found"), 404
 
@@ -104,18 +102,33 @@ def deleteQuizByID(quizID):
 def generate_quiz():
     data = request.json
     notes = data.get('notes')
+    pdf_url = data.get('pdfUrl')
     parameters = data.get('parameters')
     format_example = data.get('format')
+
+    # Process PDF if URL is provided
+    pdf_content = ""
+    if pdf_url:
+        pdf_content = extract_text_from_pdf(pdf_url) or ""
+
+    # Combine notes and PDF content
+    combined_content = f"{notes}\n{pdf_content}"
 
     chat_completion = client.chat.completions.create(
         messages=[
             {
                 "role": "system", 
-                "content": "You are a quiz generator. Generate quiz data in valid Python dictionary format only."
+                "content": "You are a quiz generator. Generate quiz data in valid Python dictionary format only based on provided notes and/or PDF content."
             },
             {
                 "role": "user", 
-                "content": f"""Generate a quiz in the following Python dictionary format:
+                "content": f"""Generate a quiz based on the following content:
+                {combined_content}
+
+                Use these parameters:
+                {parameters}
+
+                Return the quiz in the following Python dictionary format:
                 {{
                     'title': 'Quiz Title',
                     'description': 'Quiz Description',
@@ -127,9 +140,7 @@ def generate_quiz():
                             'correctAnswer': 'correct option'
                         }}
                     ]
-                }}
-                Use these notes: {notes}
-                And these parameters: {parameters}"""
+                }}"""
             }
         ],
         model="gpt-3.5-turbo",
@@ -155,6 +166,40 @@ def parse_generated_quiz(generated_text):
     # Safely evaluate the dictionary string
     quiz_data = eval(dict_text)
     return quiz_data
+
+
+def extract_text_from_pdf(pdf_path):
+    try:
+        # Handle both URLs and local file paths
+        if pdf_path.startswith(('http://', 'https://')):
+            # For URLs
+            response = requests.get(pdf_path)
+            response.raise_for_status()
+            pdf_file = io.BytesIO(response.content)
+        else:
+            # For local files - remove file:// prefix if present
+            if pdf_path.startswith('file:///'):
+                pdf_path = pdf_path[8:]  # Remove 'file:///'
+            # Open local file directly
+            pdf_file = open(pdf_path, 'rb')
+
+        # Read PDF content
+        pdf_reader = PyPDF2.PdfReader(pdf_file)
+        
+        # Extract text from all pages
+        text = ""
+        for page in pdf_reader.pages:
+            text += page.extract_text() + "\n"
+
+        # Close the file if it's a local file
+        if not isinstance(pdf_file, io.BytesIO):
+            pdf_file.close()
+
+        print(f"Extracted text from PDF: {text}")
+        return text
+    except Exception as e:
+        print(f"Error processing PDF: {str(e)}")
+        return None
     
 
 if __name__ == '__main__':

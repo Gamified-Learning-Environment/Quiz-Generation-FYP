@@ -2,10 +2,11 @@ from datetime import datetime
 
 class Quiz: 
     # constructor
-    def __init__(self, title, description, questions): # Self is a reference to current instance, title and questions are parameters
+    def __init__(self, title, description, questions, category=None): # Self is a reference to current instance, title and questions are parameters
         self.title = title
         self.description = description
         self.questions = questions
+        self.category = category
         self.created_at = datetime.now()
 
     def to_dict(self): # Convert the object to a dictionary
@@ -20,6 +21,7 @@ class Quiz:
                     'correctAnswer': question['correctAnswer']
                 } for question in self.questions
             ],
+            'category': self.category,
             'created_at': self.created_at
         }
 # create a new quiz using the quizData
@@ -28,7 +30,8 @@ def createQuiz(quizData):
     quiz = Quiz(
         title=quizData['title'], 
         description=quizData['description'],
-        questions=quizData['questions']
+        questions=quizData['questions'],
+        category=quizData.get('category')
     )
     quiz_dict = quiz.to_dict()
     quiz_dict['userId'] = quizData['userId']  # Add userId to the quiz data
@@ -41,6 +44,7 @@ def createQuiz(quizData):
         'quiz_id': quizID,
         'title': quizData['title'],
         'description': quizData['description'],
+        'category': quizData.get('category'),
         'questions': str(quizData['questions']),
         #'created_at': quizData['created_at']
     }

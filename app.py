@@ -78,6 +78,19 @@ def getAllQuizzes():
     quizzes = getAll(userId)
     return jsonify(quizzes)
 
+# get quizzes by category
+@app.route('/api/quizzes/category/<category>', methods=['GET'])
+def getQuizzesByCategory(category):
+    try:
+        quizzes = db.quizdb.quizcollection.find({'category': category})
+        quiz_list = []
+        for quiz in quizzes:
+            quiz['_id'] = str(quiz['_id'])
+            quiz_list.append(quiz)
+        return jsonify(quiz_list)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # Update a quiz by quizID using PUT method and return the response
 @app.route('/api/quiz/<quizID>', methods=['PUT'])
 def updateQuizByID(quizID):
@@ -200,6 +213,41 @@ def extract_text_from_pdf(pdf_path):
     except Exception as e:
         print(f"Error processing PDF: {str(e)}")
         return None
+    
+# Categories management
+@app.route('/api/categories', methods=['GET'])
+def getCategories():
+    try:
+        # Get custom categories from database
+        custom_categories = db.quizdb.categories.distinct('name')
+        # Combine with default categories
+        all_categories = list(set(DEFAULT_CATEGORIES + custom_categories))
+        return jsonify(all_categories)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@app.route('/api/categories', methods=['POST'])
+def addCategory():
+    try:
+        category_data = request.json
+        new_category = category_data.get('name')
+        if new_category:
+            db.quizdb.categories.insert_one({'name': new_category})
+            return jsonify({"message": "Category added successfully"})
+        return jsonify({"error": "Category name is required"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Predefined categories
+DEFAULT_CATEGORIES = [
+    "Programming",
+    "Mathematics",
+    "Science",
+    "History",
+    "Language",
+    "General Knowledge",
+    "Custom"
+]
     
 
 if __name__ == '__main__':

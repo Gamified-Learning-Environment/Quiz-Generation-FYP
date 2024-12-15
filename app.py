@@ -1,4 +1,5 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
+from init import app
 from flask_cors import CORS # import CORS
 import db # import db
 from openai import OpenAI # import OpenAI class
@@ -7,6 +8,8 @@ from bson import ObjectId
 from datetime import datetime
 import os
 from dotenv import load_dotenv 
+from werkzeug.utils import secure_filename # For image file upload handling
+from gridfs import GridFS # For file storage
 
 # For PDF parsing
 import PyPDF2
@@ -18,20 +21,14 @@ load_dotenv()
 MONGODB_URI = os.environ.get('MONGODB_URI')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 
-app = Flask(__name__) # create instance of Flask
-
-# Configure CORS properly
-CORS(app, 
-     resources={r"/api/*": {
-         "origins": ["http://localhost:3000"],
-         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-         "allow_headers": ["Content-Type", "Authorization"]
-     }},
-     supports_credentials=True)
-
 client = OpenAI( # create instance of OpenAI
     api_key=OPENAI_API_KEY
 )
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+# Initialize GridFS
+fs = GridFS(db.quizdb)
 
 # test data
 data = {
@@ -150,7 +147,8 @@ def generate_quiz():
                             'id': 1,
                             'question': 'Question text',
                             'options': ['option1', 'option2', 'option3', 'option4'],
-                            'correctAnswer': 'correct option'
+                            'correctAnswer': 'correct option',
+                            'imageUrl': None  # Optional image URL
                         }}
                     ]
                 }}"""
@@ -248,7 +246,56 @@ DEFAULT_CATEGORIES = [
     "General Knowledge",
     "Custom"
 ]
-    
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/api/upload', methods=['POST'])
+def upload_file():
+    if 'image' not in request.files:
+        return jsonify({"error": "No image part"}), 400
+        
+    file = request.files['image']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+        
+    if file and allowed_file(file.filename):
+        try:
+            # Store file in GridFS
+            filename = secure_filename(file.filename)
+            file_id = fs.put(
+                file,
+                filename=filename,
+                content_type=file.content_type
+            )
+            
+            # Generate URL using file_id
+            image_url = f"http://localhost:9090/images/{str(file_id)}"
+            
+            return jsonify({"imageUrl": image_url})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+            
+    return jsonify({"error": "Invalid file type"}), 400
+
+# Serve images from GridFS
+@app.route('/images/<file_id>')
+def serve_image(file_id):
+    try:
+        # Find file in GridFS
+        file_data = fs.get(ObjectId(file_id))
+        
+        # Create response with proper content type
+        response = send_file(
+            file_data,
+            mimetype=file_data.content_type,
+            as_attachment=False,
+            download_name=file_data.filename
+        )
+        
+        return response
+    except Exception as e:
+        return jsonify({"error": str(e)}), 404
 
 if __name__ == '__main__':
     app.run(debug=True, port=9090) # run the server in debug mode

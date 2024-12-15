@@ -18,7 +18,8 @@ class Quiz:
                     'id': question['id'],
                     'question': question['question'],
                     'options': question['options'],
-                    'correctAnswer': question['correctAnswer']
+                    'correctAnswer': question['correctAnswer'],
+                    'imageUrl': question.get('imageUrl')
                 } for question in self.questions
             ],
             'category': self.category,
@@ -27,10 +28,24 @@ class Quiz:
 # create a new quiz using the quizData
 def createQuiz(quizData):
     from db import quizdb
+
+    # Validate and process questions with images
+    processed_questions = []
+    for question in quizData['questions']:
+        processed_question = {
+            'id': question['id'],
+            'question': question['question'],
+            'options': question['options'],
+            'correctAnswer': question['correctAnswer'],
+            'imageUrl': question.get('imageUrl')  # Include imageUrl if present
+        }
+        processed_questions.append(processed_question)
+
+
     quiz = Quiz(
         title=quizData['title'], 
         description=quizData['description'],
-        questions=quizData['questions'],
+        questions=processed_questions,
         category=quizData.get('category')
     )
     quiz_dict = quiz.to_dict()
@@ -45,7 +60,7 @@ def createQuiz(quizData):
         'title': quizData['title'],
         'description': quizData['description'],
         'category': quizData.get('category'),
-        'questions': str(quizData['questions']),
+        'questions': str(processed_question),
         #'created_at': quizData['created_at']
     }
 
@@ -75,6 +90,21 @@ def getAll(userId=None):
 def updateQuiz(quizID, quizData):
     from db import quizdb
     from bson import ObjectId
+
+    # Process questions to ensure image URLs are preserved
+    if 'questions' in quizData:
+        processed_questions = []
+        for question in quizData['questions']:
+            processed_question = {
+                'id': question['id'],
+                'question': question['question'],
+                'options': question['options'],
+                'correctAnswer': question['correctAnswer'],
+                'imageUrl': question.get('imageUrl')
+            }
+            processed_questions.append(processed_question)
+        quizData['questions'] = processed_questions
+
     quiz = quizdb.quizcollection.find_one({'_id': ObjectId(quizID)})
     if quiz:
         quizdb.quizcollection.update_one({'_id': ObjectId(quizID)}, {'$set': quizData})

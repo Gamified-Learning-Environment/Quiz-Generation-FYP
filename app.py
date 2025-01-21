@@ -10,6 +10,7 @@ import os
 from dotenv import load_dotenv 
 from werkzeug.utils import secure_filename # For image file upload handling
 from gridfs import GridFS # For file storage
+from urllib.parse import unquote # For URL decoding
 
 # For PDF parsing
 import PyPDF2
@@ -191,6 +192,10 @@ def extract_text_from_pdf(pdf_path):
             # For local files - remove file:// prefix if present
             if pdf_path.startswith('file:///'):
                 pdf_path = pdf_path[8:]  # Remove 'file:///'
+
+            # Decode URL-encoded characters in the path
+            pdf_path = unquote(pdf_path)
+
             # Open local file directly
             pdf_file = open(pdf_path, 'rb')
 
@@ -206,8 +211,8 @@ def extract_text_from_pdf(pdf_path):
         if not isinstance(pdf_file, io.BytesIO):
             pdf_file.close()
 
-        print(f"Extracted text from PDF: {text}")
-        return text
+        print(f"Extracted text from PDF: {text[:200]}...") # Print first 200 characters
+        return text # Return extracted text
     except Exception as e:
         print(f"Error processing PDF: {str(e)}")
         return None

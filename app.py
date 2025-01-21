@@ -108,6 +108,75 @@ def deleteQuizByID(quizID):
         return jsonify("Quiz deleted successfully")
     return jsonify("Error: Quiz not found"), 404
 
+# Validate a quiz using POST method and return the validation result in the response
+def validate_quiz_questions(quiz_data, parameters):
+
+    # Extract difficulty from parameters
+    difficulty = parameters.get('difficulty', 'intermediate')
+
+    # Make a second call to GPT to validate questions
+    validation_response = client.chat.completions.create(
+        messages=[
+            {
+                "role": "system",
+                "content": f"""You are a quiz validator. Review quiz questions according to {difficulty} level difficultly and provide a quality assessment score (0-100) and specific feedback. 
+                For {difficulty} difficulty:
+                - Beginner: Basic recall and simple understanding
+                - Intermediate: Application and analysis
+                - Expert: Complex analysis and evaluation
+                """
+            
+            },
+            {
+                "role": "user",
+                "content": f"""Review these quiz questions for {difficulty} level appropriateness, quality, clarity, and educational value:
+                {quiz_data}
+                
+                Provide assessment in the following JSON format:
+                {{
+                    'score': <0-100>,
+                    'feedback': [
+                        {{
+                            'question_id': <id>,
+                            'score': <0-100>,
+                            'difficulty_rating': <'too_easy'|'appropriate'|'too_hard'>,
+                            'issues': ['issue1', 'issue2'],
+                            'suggestions': ['suggestion1', 'suggestion2']
+                        }}
+                    ],
+                    'difficulty_alignment': <0-100>,
+                    'overall_feedback': 'summary of assessment'
+                }}"""
+            }
+        ],
+        model="gpt-3.5-turbo",
+    )
+    
+    # Parse and clean validation result
+    validation_result = validation_response.choices[0].message.content.strip()
+    # Remove any text before the first '{' and after the last '}'
+    start = validation_result.find('{')
+    end = validation_result.rfind('}') + 1
+    if start == -1 or end == 0:
+        raise ValueError("No valid dictionary found in validation response")
+    validation_result = validation_result[start:end]
+
+    validation = eval(validation_result)
+    
+    # Add difficulty check threshold
+    difficulty_threshold = {
+        'beginner': 70,
+        'intermediate': 75,
+        'expert': 80
+    }
+
+    # Update the generate_quiz route to consider difficulty alignment
+    if validation['difficulty_alignment'] < difficulty_threshold[difficulty]:
+        validation['score'] = min(validation['score'], validation['difficulty_alignment'])
+        validation['overall_feedback'] = f"Quiz difficulty ({validation['difficulty_alignment']}/100) does not align well with {difficulty} level. {validation['overall_feedback']}"
+
+    return validation
+
 # Generate a quiz using POST method and return the quiz in the response
 @app.route('/api/generate-quiz', methods=['POST'])
 def generate_quiz():
@@ -163,9 +232,24 @@ def generate_quiz():
     try:
         quiz_data = parse_generated_quiz(generated_text)
         print(quiz_data)
+
+        # Validate quiz questions
+        validation = validate_quiz_questions(quiz_data, parameters)
+
+        # Check both overall quality and difficulty alignment
+        if validation['score'] < 70 or validation['difficulty_alignment'] < parameters.get('difficulty_threshold', 70):
+            quiz_data['validation'] = validation
+            quiz_data['warning'] = "Quiz may not meet quality or difficulty requirements"
+            return jsonify(quiz_data)  # Return the whole quiz data object
+            
+        # Add validation results to quiz data
+        quiz_data['validation'] = validation
+
+        print("Quiz validation passed successfully with score:", validation['score'])
+
         return jsonify(quiz_data)
     except Exception as e:
-        return jsonify({"error": "Failed to parse quiz data", "details": str(e)}), 400
+        return jsonify({"error": "Failed to generate/validate quiz", "details": str(e)}), 400
 
 def parse_generated_quiz(generated_text):
     # Remove any text before the first '{' and after the last '}'

@@ -198,7 +198,7 @@ def generate_quiz():
         messages=[
             {
                 "role": "system", 
-                "content": "You are a quiz generator. Generate quiz data in valid Python dictionary format only based on provided notes and/or PDF content."
+                "content": """You are a quiz generator. Generate quiz data in valid Python dictionary format only based on provided notes and/or PDF content. Include short, concise explanations for correct answers."""
             },
             {
                 "role": "user", 
@@ -218,6 +218,7 @@ def generate_quiz():
                             'question': 'Question text',
                             'options': ['option1', 'option2', 'option3', 'option4'],
                             'correctAnswer': 'correct option',
+                            'explanation': 'Short explanation of why this is the correct answer',
                             'imageUrl': None  # Optional image URL
                         }}
                     ]

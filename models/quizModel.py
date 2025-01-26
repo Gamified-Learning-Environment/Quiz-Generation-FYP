@@ -19,6 +19,7 @@ class Quiz:
                     'question': question['question'],
                     'options': question['options'],
                     'correctAnswer': question['correctAnswer'],
+                    'isMultiAnswer': question.get('isMultiAnswer', False),
                     'imageUrl': question.get('imageUrl')
                 } for question in self.questions
             ],
@@ -37,7 +38,9 @@ def createQuiz(quizData):
             'question': question['question'],
             'options': question['options'],
             'correctAnswer': question['correctAnswer'],
-            'imageUrl': question.get('imageUrl')  # Include imageUrl if present
+            'imageUrl': question.get('imageUrl'),  # Include imageUrl if present
+            'isMultiAnswer': question.get('isMultiAnswer', False),
+            'explanation': question.get('explanation')
         }
         processed_questions.append(processed_question)
 

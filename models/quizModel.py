@@ -20,7 +20,8 @@ class Quiz:
                     'options': question['options'],
                     'correctAnswer': question['correctAnswer'],
                     'isMultiAnswer': question.get('isMultiAnswer', False),
-                    'imageUrl': question.get('imageUrl')
+                    'imageUrl': question.get('imageUrl'),
+                    'explanation': question.get('explanation')
                 } for question in self.questions
             ],
             'category': self.category,
@@ -103,7 +104,9 @@ def updateQuiz(quizID, quizData):
                 'question': question['question'],
                 'options': question['options'],
                 'correctAnswer': question['correctAnswer'],
-                'imageUrl': question.get('imageUrl')
+                'isMultiAnswer': question.get('isMultiAnswer', False),
+                'imageUrl': question.get('imageUrl'),
+                'explanation': question.get('explanation')
             }
             processed_questions.append(processed_question)
         quizData['questions'] = processed_questions

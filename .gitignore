@@ -127,3 +127,7 @@ dmypy.json
 .env
 .env.*
 
+# virtualenv
+__pycache__/
+models/__pycache__/
+

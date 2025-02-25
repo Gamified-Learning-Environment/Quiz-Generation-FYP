@@ -114,22 +114,30 @@ def validate_quiz_questions(quiz_data, parameters):
     # Extract difficulty from parameters
     difficulty = parameters.get('difficulty', 'intermediate')
 
-    # Make a second call to GPT to validate questions
+    # Make validation call to GPT
     validation_response = client.chat.completions.create(
         messages=[
             {
                 "role": "system",
-                "content": f"""You are a quiz validator. Review quiz questions according to {difficulty} level difficultly and provide a quality assessment score (0-100) and specific feedback. 
-                For {difficulty} difficulty:
-                - Beginner: Basic recall and simple understanding
-                - Intermediate: Application and analysis
-                - Expert: Complex analysis and evaluation
+                "content": f"""You are a quiz validator. Review quiz questions for {difficulty} level difficultly and provide a quality assessment. 
+                
+                Validation criteria:
+                1. Question clarity and structure
+                2. Option quality and distinctiveness
+                3. Correct answer appropriateness
+                4. Difficulty level alignment
+                5. Educational value
+                
+                For {difficulty} difficulty expectations:
+                - Beginner: Basic concepts, simple language
+                - Intermediate: Applied knowledge, moderate complexity
+                - Expert: Advanced concepts, complex analysis
                 """
             
             },
             {
                 "role": "user",
-                "content": f"""Review these quiz questions for {difficulty} level appropriateness, quality, clarity, and educational value:
+                "content": f"""Review these quiz questions for {difficulty} level:
                 {quiz_data}
                 
                 Provide assessment in the following JSON format:
@@ -145,7 +153,7 @@ def validate_quiz_questions(quiz_data, parameters):
                         }}
                     ],
                     'difficulty_alignment': <0-100>,
-                    'overall_feedback': 'summary of assessment'
+                    'overall_feedback': <summary>
                 }}"""
             }
         ],
@@ -161,7 +169,7 @@ def validate_quiz_questions(quiz_data, parameters):
         raise ValueError("No valid dictionary found in validation response")
     validation_result = validation_result[start:end]
 
-    validation = eval(validation_result)
+    validation = eval(validation_result[start:end])
     
     # Add difficulty check threshold
     difficulty_threshold = {
@@ -176,6 +184,29 @@ def validate_quiz_questions(quiz_data, parameters):
         validation['overall_feedback'] = f"Quiz difficulty ({validation['difficulty_alignment']}/100) does not align well with {difficulty} level. {validation['overall_feedback']}"
 
     return validation
+
+@app.route('/api/validate-quiz', methods=['POST'])
+def validate_quiz():
+    try:
+        data = request.json
+        questions = data.get('questions', [])
+        parameters = data.get('parameters', {})
+        
+        validation = validate_quiz_questions({
+            'questions': questions,  
+            'title': '',  
+            'description': ''
+        }, parameters)
+        
+        return jsonify({
+            'validation': validation
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "error": "Failed to validate quiz",
+            "details": str(e)
+        }), 400
 
 # Generate a quiz using POST method and return the quiz in the response
 @app.route('/api/generate-quiz', methods=['POST'])

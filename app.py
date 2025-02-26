@@ -278,6 +278,9 @@ def generate_quiz_claude():
         validation = validate_quiz_questions(quiz_data, parameters)
         quiz_data['validation'] = validation
 
+        # Add AI model to the quiz data
+        quiz_data['aiModel'] = 'claude'
+
         return jsonify(quiz_data)
     except Exception as e:
         print(f"Claude API Error: {str(e)}") 
@@ -356,6 +359,9 @@ def generate_quiz():
         quiz_data['validation'] = validation
 
         print("Quiz validation passed successfully with score:", validation['score'])
+
+        # Add AI model to the quiz data
+        quiz_data['aiModel'] = 'gpt'
 
         return jsonify(quiz_data)
     except Exception as e:

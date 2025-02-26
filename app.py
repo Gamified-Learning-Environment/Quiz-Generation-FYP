@@ -17,13 +17,23 @@ import PyPDF2
 import requests
 import io
 
+# Import Anthropic
+from anthropic import Anthropic
+
 # load environment variables from .env file
 load_dotenv()
 MONGODB_URI = os.environ.get('MONGODB_URI')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY')
 
+# Initialize GPT client
 client = OpenAI( # create instance of OpenAI
     api_key=OPENAI_API_KEY
+)
+
+# Initialize claude client
+claude_client = Anthropic(
+    api_key=ANTHROPIC_API_KEY
 )
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
@@ -207,6 +217,72 @@ def validate_quiz():
             "error": "Failed to validate quiz",
             "details": str(e)
         }), 400
+    
+# Route for Claude generation
+@app.route('/api/generate-quiz-claude', methods=['POST'])
+def generate_quiz_claude():
+    data = request.json
+    notes = data.get('notes')
+    pdf_url = data.get('pdfUrl')
+    parameters = data.get('parameters')
+    question_count = data['parameters'].get('questionCount', 1)
+    difficulty = parameters.get('difficulty', 'intermediate')
+
+    # Process PDF if URL is provided
+    pdf_content = ""
+    if pdf_url:
+        pdf_content = extract_text_from_pdf(pdf_url) or ""
+
+    # Combine notes and PDF content
+    combined_content = f"{notes}\n{pdf_content}"
+
+    try:
+        # Claude API expects system content as a top-level parameter
+        completion = claude_client.messages.create(
+            model="claude-3-7-sonnet-20250219",
+            messages=[{
+                "role": "user",
+                "content": f"""Generate a {difficulty} level quiz with {question_count} questions based on:
+
+                Content: {combined_content}
+
+                Format response as a Python dictionary with this EXACT structure:
+                {{
+                    'title': 'Quiz Title',
+                    'description': 'Brief description',
+                    'questions': [
+                        {{
+                            'id': '1',
+                            'question': 'Question text',
+                            'options': ['option1', 'option2', 'option3', 'option4'],
+                            'correctAnswer': 'correct option',
+                            'explanation': 'Brief explanation'
+                        }}
+                    ]
+                }}"""
+            }],
+            max_tokens=20000,
+            temperature=1,
+        )
+        
+        # Get the response text from Claude's new response structure
+        generated_text = completion.content
+        if isinstance(generated_text, list) and len(generated_text) > 0:
+            generated_text = generated_text[0].text
+
+        # Clean and parse the response
+        quiz_data = parse_generated_quiz(generated_text)
+
+        print("Claude AI RESPONSE ", quiz_data)
+
+        validation = validate_quiz_questions(quiz_data, parameters)
+        quiz_data['validation'] = validation
+
+        return jsonify(quiz_data)
+    except Exception as e:
+        print(f"Claude API Error: {str(e)}") 
+        return jsonify({"error": str(e)}), 400
+
 
 # Generate a quiz using POST method and return the quiz in the response
 @app.route('/api/generate-quiz', methods=['POST'])
@@ -216,6 +292,8 @@ def generate_quiz():
     pdf_url = data.get('pdfUrl')
     parameters = data.get('parameters')
     format_example = data.get('format')
+    question_count = data['parameters'].get('questionCount', 1)
+    difficulty = parameters.get('difficulty', 'intermediate')
 
     # Process PDF if URL is provided
     pdf_content = ""
@@ -233,7 +311,7 @@ def generate_quiz():
             },
             {
                 "role": "user", 
-                "content": f"""Generate a quiz based on the following content:
+                "content": f"""Generate a {difficulty} level quiz with {question_count} questions based on the following content:
                 {combined_content}
 
                 Use these parameters:
@@ -263,7 +341,7 @@ def generate_quiz():
     
     try:
         quiz_data = parse_generated_quiz(generated_text)
-        print(quiz_data)
+        print("OPEN AI RESPONSE ", quiz_data)
 
         # Validate quiz questions
         validation = validate_quiz_questions(quiz_data, parameters)
@@ -281,15 +359,25 @@ def generate_quiz():
 
         return jsonify(quiz_data)
     except Exception as e:
+        print(f"Generation error: {str(e)}") 
         return jsonify({"error": "Failed to generate/validate quiz", "details": str(e)}), 400
 
+
 def parse_generated_quiz(generated_text):
+
+    # Clean up the response text
+    text = generated_text.strip()
+
     # Remove any text before the first '{' and after the last '}'
-    start = generated_text.find('{')
-    end = generated_text.rfind('}') + 1
+    start = text.find('{')
+    end = text.rfind('}') + 1
     if start == -1 or end == 0:
         raise ValueError("No valid dictionary found in response")
-    dict_text = generated_text[start:end]
+    dict_text = text[start:end]
+
+    # Remove any markdown formatting
+    dict_text = dict_text.replace('```python', '').replace('```', '')
+    dict_text = dict_text.strip()
     
     # Safely evaluate the dictionary string
     quiz_data = eval(dict_text)

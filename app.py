@@ -7,6 +7,7 @@ from models.quizModel import createQuiz, getQuiz, getAll, updateQuiz, deleteQuiz
 from bson import ObjectId 
 from datetime import datetime
 import os
+import uuid
 from dotenv import load_dotenv 
 from werkzeug.utils import secure_filename # For image file upload handling
 from gridfs import GridFS # For file storage
@@ -25,6 +26,8 @@ load_dotenv()
 MONGODB_URI = os.environ.get('MONGODB_URI')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY')
+
+CORS(app, supports_credentials=True) # enable CORS
 
 # Initialize GPT client
 client = OpenAI( # create instance of OpenAI
@@ -62,13 +65,61 @@ def insert_data():
 
 # Create a new quiz using POST method and return the quizID in the response
 @app.route('/api/quiz', methods=['POST'])
-def createNewQuiz():
-    quizData = request.json
-    quizResponse = createQuiz(quizData)
-    return jsonify({
-        "message": "Quiz created successfully",
-        "quizid": quizResponse['quiz_id']
-    }), 201
+#def createNewQuiz():
+    #quizData = request.json
+    #quizResponse = createQuiz(quizData)
+    #return jsonify({
+        #"message": "Quiz created successfully",
+        #"quizid": quizResponse['quiz_id']
+    #}), 201
+
+def CreateQuiz():
+    try: 
+        # Pull data from request
+        quizData = request.json
+
+        # Validate required fields
+        if not quizData.get('title') or not quizData.get('questions'):
+            return jsonify({"error": "Title and questions are required"}), 400
+        
+        # Generate unique quiz ID
+        quizId = str(uuid.uuid4())
+
+        # Build quiz object
+        newQuiz = {
+            '_id': quizId,
+            'id': quizId, # For compatibility with frontend
+            'title': quizData['title'],
+            'description': quizData.get('description', ''),
+            'category': quizData.get('category', 'Custom'),
+            'difficulty': quizData.get('difficulty', 'intermediate'),
+            'userId': quizData.get('userId', ''),
+            'questions': []
+        }
+
+        # Process questions with new IDs
+        for question in quizData.get('questions', []):
+            questionId = str(uuid.uuid4())
+            newQuiz['questions'].append({
+                'id': questionId,
+                'question': question['question'],
+                'options': question['options'],
+                'correctAnswer': question['correctAnswer'],
+                'imageUrl': question.get('imageUrl'),
+                'explanation': question.get('explanation', False),
+                'explanation': question.get('explanation', '')
+            })
+
+        # Store in DB
+        db.quizdb.quizcollection.insert_one(newQuiz)
+
+        # Return response
+        return jsonify(newQuiz), 201
+
+    except Exception as e:
+        print(f"Error creating quiz: {e}")
+        return jsonify({"error": "Failed to create quiz", "details": str(e)}), 500
+    
 
 # Get a quiz by quizID using GET method and return the quiz in the response
 @app.route('/api/quiz/<quizID>', methods=['GET'])

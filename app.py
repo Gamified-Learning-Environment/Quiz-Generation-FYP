@@ -82,13 +82,13 @@ def CreateQuiz():
         if not quizData.get('title') or not quizData.get('questions'):
             return jsonify({"error": "Title and questions are required"}), 400
         
-        # Generate unique quiz ID
-        quizId = str(uuid.uuid4())
+        quizResponse = createQuiz(quizData)
+
+        quizId = quizResponse['quiz_id']
 
         # Build quiz object
         newQuiz = {
             '_id': quizId,
-            'id': quizId, # For compatibility with frontend
             'title': quizData['title'],
             'description': quizData.get('description', ''),
             'category': quizData.get('category', 'Custom'),
@@ -110,8 +110,6 @@ def CreateQuiz():
                 'explanation': question.get('explanation', '')
             })
 
-        # Store in DB
-        db.quizdb.quizcollection.insert_one(newQuiz)
 
         # Return response
         return jsonify(newQuiz), 201

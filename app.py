@@ -475,6 +475,52 @@ def extract_text_from_pdf(pdf_path):
     except Exception as e:
         print(f"Error processing PDF: {str(e)}")
         return None
+
+@app.route('/api/upload-pdf', methods=['POST'])
+def upload_pdf():
+    if 'pdf' not in request.files: # Check if 'pdf' part is in the request
+        return jsonify({"error": "No pdf part"}), 400
+        
+    file = request.files['pdf'] # Get the file from the request
+    if file.filename == '': # Check if filename is empty
+        return jsonify({"error": "No selected file"}), 400
+    
+    try: # Try to process the file
+        # Store file in GridFS
+        filename = secure_filename(file.filename) # Secure the filename
+        file_id = fs.put( 
+            file, 
+            filename=filename,
+            content_type=file.content_type
+        ) # Store the file in GridFS
+        
+        # Generate URL to access the PDF
+        # Use environment variable for production URL
+        base_url = os.environ.get('SERVICE_URL', 'http://localhost:9090')
+        pdf_url = f"{base_url}/pdfs/{str(file_id)}"
+        
+        return jsonify({"pdfUrl": pdf_url})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/pdfs/<file_id>')
+def serve_pdf(file_id):
+    try:
+        # Find file in GridFS
+        file_data = fs.get(ObjectId(file_id))
+        
+        # Create response with proper content type
+        response = send_file(
+            file_data,
+            mimetype='application/pdf',
+            as_attachment=False,
+            download_name=file_data.filename
+        )
+        
+        return response
+    except Exception as e:
+        return jsonify({"error": str(e)}), 404
+
     
 # Categories management
 @app.route('/api/categories', methods=['GET'])

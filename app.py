@@ -94,6 +94,7 @@ def CreateQuiz():
             'category': quizData.get('category', 'Custom'),
             'difficulty': quizData.get('difficulty', 'intermediate'),
             'userId': quizData.get('userId', ''),
+            'randomizeQuestions': quizData.get('randomizeQuestions', False), 
             'questions': []
         }
 

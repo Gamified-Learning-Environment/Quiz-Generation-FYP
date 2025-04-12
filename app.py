@@ -65,16 +65,14 @@ def insert_data():
 
 # Create a new quiz using POST method and return the quizID in the response
 @app.route('/api/quiz', methods=['POST'])
-#def createNewQuiz():
-    #quizData = request.json
-    #quizResponse = createQuiz(quizData)
-    #return jsonify({
-        #"message": "Quiz created successfully",
-        #"quizid": quizResponse['quiz_id']
-    #}), 201
-
 def CreateQuiz():
     try: 
+
+        db.quiz_collection.update_many(
+            {"useQuestionPool": {"$exists": False}},
+            {"$set": {"useQuestionPool": False, "questionsPerAttempt": None}}
+        )
+        
         # Pull data from request
         quizData = request.json
 
@@ -95,6 +93,8 @@ def CreateQuiz():
             'difficulty': quizData.get('difficulty', 'intermediate'),
             'userId': quizData.get('userId', ''),
             'randomizeQuestions': quizData.get('randomizeQuestions', False), 
+            'useQuestionPool': quizData.get('useQuestionPool', False),
+            'questionsPerAttempt': quizData.get('questionsPerAttempt'),
             'questions': []
         }
 

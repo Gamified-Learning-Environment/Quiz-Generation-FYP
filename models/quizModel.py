@@ -2,7 +2,7 @@ from datetime import datetime
 
 class Quiz: 
     # constructor
-    def __init__(self, title, description, questions, category=None, aiModel=None, randomizeQuestions=False): # Self is a reference to current instance, title and questions are parameters
+    def __init__(self, title, description, questions, category=None, aiModel=None, randomizeQuestions=False, useQuestionPool=False, questionsPerAttempt=None): # Self is a reference to current instance, title and questions are parameters
         self.title = title
         self.description = description
         self.questions = questions
@@ -10,6 +10,8 @@ class Quiz:
         self.aiModel = aiModel
         self.created_at = datetime.now()
         self.randomizeQuestions = randomizeQuestions  
+        self.useQuestionPool = useQuestionPool
+        self.questionsPerAttempt = questionsPerAttempt
 
     def to_dict(self): # Convert the object to a dictionary
         return {
@@ -29,6 +31,8 @@ class Quiz:
             'category': self.category,
             'aiModel': self.aiModel,
             'randomizeQuestions': self.randomizeQuestions,
+            'useQuestionPool': self.useQuestionPool,
+            'questionsPerAttempt': self.questionsPerAttempt,
             'created_at': self.created_at
         }
 # create a new quiz using the quizData
@@ -56,7 +60,9 @@ def createQuiz(quizData):
         questions=processed_questions,
         category=quizData.get('category'),
         aiModel=quizData.get('aiModel'),
-        randomizeQuestions=quizData.get('randomizeQuestions', False) # Default to False if not provided
+        randomizeQuestions=quizData.get('randomizeQuestions', False), # Default to False if not provided
+        useQuestionPool=quizData.get('useQuestionPool', False), # Default to False if not provided
+        questionsPerAttempt=quizData.get('questionsPerAttempt', None) # Default to None if not provided
     )
     quiz_dict = quiz.to_dict()
     quiz_dict['userId'] = quizData['userId']  # Add userId to the quiz data

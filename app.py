@@ -23,7 +23,7 @@ from anthropic import Anthropic
 
 # Import Google gemini
 import google.generativeai as genai
-import json
+
 
 # load environment variables from .env file
 load_dotenv()

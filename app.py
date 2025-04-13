@@ -21,11 +21,16 @@ import io
 # Import Anthropic
 from anthropic import Anthropic
 
+# Import Google gemini
+import google.generativeai as genai
+import json
+
 # load environment variables from .env file
 load_dotenv()
 MONGODB_URI = os.environ.get('MONGODB_URI')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY')
+GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
 
 CORS(app, supports_credentials=True) # enable CORS
 
@@ -38,6 +43,12 @@ client = OpenAI( # create instance of OpenAI
 claude_client = Anthropic(
     api_key=ANTHROPIC_API_KEY
 )
+
+# Configure the Gemini API
+if GOOGLE_API_KEY:
+    genai.configure(api_key=GOOGLE_API_KEY)
+else:
+    print("Warning: GOOGLE_API_KEY not found in environment variables")
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
@@ -67,11 +78,6 @@ def insert_data():
 @app.route('/api/quiz', methods=['POST'])
 def CreateQuiz():
     try: 
-
-        db.quiz_collection.update_many(
-            {"useQuestionPool": {"$exists": False}},
-            {"$set": {"useQuestionPool": False, "questionsPerAttempt": None}}
-        )
         
         # Pull data from request
         quizData = request.json
@@ -268,6 +274,72 @@ def validate_quiz():
             "details": str(e)
         }), 400
     
+@app.route('/api/generate-quiz-gemini', methods=['POST'])
+def generate_quiz_gemini():
+    data = request.json
+    notes = data.get('notes')
+    pdf_url = data.get('pdfUrl')
+    parameters = data.get('parameters')
+    question_count = data['parameters'].get('questionCount', 1)
+    difficulty = parameters.get('difficulty', 'intermediate')
+
+    # Process PDF if URL is provided
+    pdf_content = ""
+    if pdf_url:
+        pdf_content = extract_text_from_pdf(pdf_url) or ""
+
+    # Combine notes and PDF content
+    combined_content = f"{notes}\n{pdf_content}"
+
+    try:
+        # Configure the model
+        model = genai.GenerativeModel('gemini-1.5-pro')
+        
+        # Create prompt for Gemini
+        prompt = f"""Generate a {difficulty} level quiz with {question_count} questions based on:
+
+        Content: {combined_content}
+
+        Format response as a valid JSON dictionary with exactly this structure:
+        {{
+            "title": "Quiz Title",
+            "description": "Brief description",
+            "questions": [
+                {{
+                    "id": "1",
+                    "question": "Question text",
+                    "options": ["option1", "option2", "option3", "option4"],
+                    "correctAnswer": "correct option",
+                    "explanation": "Brief explanation"
+                }}
+            ]
+        }}
+
+        Important: Use double quotes for all keys and string values. Return only the JSON object without any additional text or code formatting."""
+
+        # Generate content
+        response = model.generate_content(prompt)
+        
+        # Extract the text from the response
+        generated_text = response.text
+        
+        # Clean and parse the response
+        quiz_data = parse_generated_quiz(generated_text)
+        
+        print("GEMINI AI RESPONSE ", quiz_data)
+
+        # Validate quiz questions
+        validation = validate_quiz_questions(quiz_data, parameters)
+        quiz_data['validation'] = validation
+
+        # Add AI model to the quiz data
+        quiz_data['aiModel'] = 'gemini'
+
+        return jsonify(quiz_data)
+    except Exception as e:
+        print(f"Gemini API Error: {str(e)}")
+        return jsonify({"error": str(e)}), 400
+    
 # Route for Claude generation
 @app.route('/api/generate-quiz-claude', methods=['POST'])
 def generate_quiz_claude():
@@ -427,8 +499,10 @@ def parse_generated_quiz(generated_text):
     # Remove any text before the first '{' and after the last '}'
     start = text.find('{')
     end = text.rfind('}') + 1
+
     if start == -1 or end == 0:
         raise ValueError("No valid dictionary found in response")
+    
     dict_text = text[start:end]
 
     # Remove any markdown formatting

@@ -425,7 +425,11 @@ def generate_quiz():
     if pdf_url:
         pdf_content = extract_text_from_pdf(pdf_url) or ""
 
-    # Combine notes and PDF content
+    # For larger question counts, use batching
+    if question_count > 20:
+        return generate_questions_in_batches(notes, pdf_content, parameters, question_count, difficulty)
+
+        # Original code for smaller question counts - Combine notes and PDF content
     combined_content = f"{notes}\n{pdf_content}"
 
     chat_completion = client.chat.completions.create(
@@ -460,6 +464,7 @@ def generate_quiz():
             }
         ],
         model="gpt-3.5-turbo",
+        max_tokens=4000,
     )
 
     generated_text = chat_completion.choices[0].message.content.strip()
@@ -490,6 +495,92 @@ def generate_quiz():
         print(f"Generation error: {str(e)}") 
         return jsonify({"error": "Failed to generate/validate quiz", "details": str(e)}), 400
 
+# Generate a large number of questions by making multiple smaller requests
+def generate_questions_in_batches(notes, pdf_content, parameters, total_question_count, difficulty):
+    combined_content = f"{notes}\n{pdf_content}"
+    all_questions = []
+    batch_size = 10  # Reduce batch size from 15 to 10
+    
+    # If content is very large, we need to split it
+    if len(combined_content) > 30000:  # ~7500 tokens
+        # Take just enough content for context in each batch
+        content_chunks = []
+        chunk_size = 25000  # ~6250 tokens
+        for i in range(0, len(combined_content), chunk_size):
+            content_chunks.append(combined_content[i:i+chunk_size])
+    else:
+        content_chunks = [combined_content]
+    
+    batches_needed = (total_question_count + batch_size - 1) // batch_size
+    
+    for batch in range(batches_needed):
+        questions_in_batch = min(batch_size, total_question_count - len(all_questions))
+        if questions_in_batch <= 0:
+            break
+            
+        # Select which content chunk to use (rotate through chunks)
+        content_to_use = content_chunks[batch % len(content_chunks)]
+        
+        print(f"Generating batch {batch+1}/{batches_needed} with {questions_in_batch} questions")
+        
+        # Generate batch of questions
+        batch_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system", 
+                    "content": """You are a quiz generator. Generate quiz data in valid Python dictionary format only."""
+                },
+                {
+                    "role": "user", 
+                    "content": f"""Generate a {difficulty} level quiz with EXACTLY {questions_in_batch} questions based on the following content.
+                    These will be part {batch+1} of {batches_needed} in a larger quiz, so make them diverse:
+                    {content_to_use}
+                    
+                    Return the quiz in the following Python dictionary format:
+                    {{
+                        'title': 'Quiz Part {batch+1}',
+                        'description': 'Generated quiz questions part {batch+1}',
+                        'questions': [
+                            {{
+                                'id': '{batch*batch_size+1}',
+                                'question': 'Question text',
+                                'options': ['option1', 'option2', 'option3', 'option4'],
+                                'correctAnswer': 'correct option',
+                                'explanation': 'Short explanation of why this is the correct answer'
+                            }}
+                        ]
+                    }}"""
+                }
+            ],
+            model="gpt-3.5-turbo",
+            max_tokens=3000  # Reduced from 4000
+        )
+        
+        # Parse batch results
+        generated_text = batch_completion.choices[0].message.content.strip()
+        batch_data = parse_generated_quiz(generated_text)
+        
+        # Add to combined results
+        all_questions.extend(batch_data.get('questions', []))
+        
+        # If this is the first batch, get the title and description
+        if batch == 0:
+            title = batch_data.get('title', f"{difficulty.capitalize()} Quiz")
+            description = batch_data.get('description', f"A {difficulty} level quiz with {total_question_count} questions")
+    
+    # Create combined result
+    combined_quiz = {
+        "title": title,
+        "description": description,
+        "questions": all_questions[:total_question_count],  # Only take the requested number
+        "aiModel": "gpt"
+    }
+    
+    # Validate combined quiz
+    validation = validate_quiz_questions(combined_quiz, parameters)
+    combined_quiz['validation'] = validation
+    
+    return combined_quiz
 
 def parse_generated_quiz(generated_text):
 
@@ -514,7 +605,7 @@ def parse_generated_quiz(generated_text):
     return quiz_data
 
 
-def extract_text_from_pdf(pdf_path):
+def extract_text_from_pdf(pdf_path, check_size=True):
     try:
         # Handle both URLs and local file paths
         if pdf_path.startswith(('http://', 'https://')):
@@ -535,17 +626,32 @@ def extract_text_from_pdf(pdf_path):
 
         # Read PDF content
         pdf_reader = PyPDF2.PdfReader(pdf_file)
-        
-        # Extract text from all pages
+        total_pages = len(pdf_reader.pages)
+        print(f"Extracting text from {total_pages} pages of PDF")
+
+        # For smaller PDFs, proceed with normal extraction
         text = ""
         for page in pdf_reader.pages:
             text += page.extract_text() + "\n"
+        
+        # Check if PDF is large
+        if check_size and len(text) > 60000:
+            if not isinstance(pdf_file, io.BytesIO):
+                pdf_file.close()
+            # Return a signal that this PDF is too large
+            return "PDF_TOO_LARGE"
 
         # Close the file if it's a local file
         if not isinstance(pdf_file, io.BytesIO):
             pdf_file.close()
 
-        print(f"Extracted text from PDF: {text[:200]}...") # Print first 200 characters
+        # Check if total text is too large (approx 15,000 tokens ~= 60,000 chars)
+        if check_size and len(text) > 60000:
+            return "PDF_TOO_LARGE"
+
+        print(f"EXTRACTED TEST START: {text[:100]}...") # Print first 200 characters
+        print(f"EXTRACTED TEXT END: {text[-100:]}...") # Print last 200 characters
+        print(f"TOTAL CHARACTERS: {len(text)} characters")
         return text # Return extracted text
     except Exception as e:
         print(f"Error processing PDF: {str(e)}")
@@ -596,6 +702,120 @@ def serve_pdf(file_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 404
 
+# Process large PDFs in seperate batches, generating questions based on extracted key concepts
+def process_large_pdf(pdf_path, question_count, difficulty): 
+    try: 
+        # Open pdf using same method as extract_text_from_pdf
+        if pdf_path.startswith(('http://', 'https://')):
+            # For URLs
+            response = requests.get(pdf_path)
+            response.raise_for_status()
+            pdf_file = io.BytesIO(response.content)
+        else:
+            # For local files - remove file:// prefix if present
+            if pdf_path.startswith('file:///'):
+                pdf_path = pdf_path[8:]  # Remove 'file:///'
+
+            # Decode URL-encoded characters in the path
+            pdf_path = unquote(pdf_path)
+
+            # Open local file directly
+            pdf_file = open(pdf_path, 'rb')
+
+        # Read PDF content
+        pdf_reader = PyPDF2.PdfReader(pdf_file)
+        total_pages = len(pdf_reader.pages)
+
+        print("Processing large PDF with {total_pages} pages")
+
+        # Step 1: Process PDF in batches and extract key concepts
+        batch_size = min(5, total_pages) # Process 5 pages at a time
+        all_concepts = []
+
+        for start_page in range(0, total_pages, batch_size):
+            # Get text from this batch of pages
+            batch_text = ""
+            end_page = min(start_page + batch_size, total_pages)
+
+            for i in range(start_page, end_page):
+                page_text = pdf_reader.pages[i].extract_text() or ""
+                batch_text += page_text + "\n"
+
+            # Skip empty batches
+            if not batch_text.strip():
+                continue
+
+            # Extract key concepts from the batch using AI
+            concepts_per_batch = max(1, question_count //  ((total_pages // batch_size) + 1))
+            print(f"Extracting {concepts_per_batch} concepts from pages {start_page + 1} to {end_page}")
+
+            concept_response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "Extract the most important concepts, terms, and facts from this text that would be good for quiz questions."},
+                    {"role": "user", "content": f"Identify {concepts_per_batch} key concepts from this text that would make excellent quiz questions at {difficulty} level. Format each concept as a single sentence with the main term or idea clearly stated:\n\n{batch_text}"}
+                ]
+            )
+
+            # Parse concepts
+            concepts_text = concept_response.choices[0].message.content.strip()
+            concepts = [c.strip() for c in concepts_text.split('\n') if c.strip()]
+            all_concepts.extend(concepts)
+
+            print(f"Extracted {len(concepts)} concepts from batch")
+
+        if not isinstance(pdf_file, io.BytesIO):
+            pdf_file.close()
+
+        # Step 2: Generate quiz questions based on extracted concepts
+        concept_text = "\n".join(all_concepts)
+        print(f"Generating quiz based on {len(all_concepts)} extracted concepts")
+
+        # Generate the quiz using the concepts
+        chat_completion = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {
+                    "role": "system", 
+                    "content": f"You are a quiz generator specializing in creating {difficulty} level questions based on key concepts provided."
+                },
+                {
+                    "role": "user", 
+                    "content": f"""Create a {difficulty} level quiz with exactly {question_count} questions based on these key concepts extracted from a document:
+                    
+                    {concept_text}
+                    
+                    Make sure each question is challenging but fair for {difficulty} level students.
+                    
+                    Return the quiz in this Python dictionary format:
+                    {{
+                        'title': 'Quiz Title Based on Document Content',
+                        'description': 'Brief description of quiz content and focus',
+                        'questions': [
+                            {{
+                                'id': '1',
+                                'question': 'Question text',
+                                'options': ['option1', 'option2', 'option3', 'option4'],
+                                'correctAnswer': 'correct option',
+                                'explanation': 'Brief explanation of the answer'
+                            }}
+                        ]
+                    }}
+                    """
+                }
+            ]
+        )
+
+        generated_text = chat_completion.choices[0].message.content.strip()
+        quiz_data = parse_generated_quiz(generated_text)
+        
+        # Add metadata to indicate this was processed using the large PDF method
+        quiz_data["processingMethod"] = "large-pdf-two-stage"
+
+        return quiz_data
+    except Exception as e:
+        print(f"Error processing large PDF: {str(e)}")
+        return {"error": str(e)}
     
 # Categories management
 @app.route('/api/categories', methods=['GET'])

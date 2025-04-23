@@ -180,7 +180,6 @@ def validate_quiz_questions(quiz_data, parameters):
     # Extract difficulty from parameters
     difficulty = parameters.get('difficulty', 'intermediate')
 
-    # Make validation call to GPT
     validation_response = client.chat.completions.create(
         messages=[
             {
@@ -232,12 +231,12 @@ def validate_quiz_questions(quiz_data, parameters):
     start = validation_result.find('{')
     end = validation_result.rfind('}') + 1
     if start == -1 or end == 0:
-        raise ValueError("No valid dictionary found in validation response")
+        raise ValueError("No valid dictionary found in GPT validation response")
     validation_result = validation_result[start:end]
 
     validation = eval(validation_result[start:end])
     
-    # Add difficulty check threshold
+    # Define difficulty threshold
     difficulty_threshold = {
         'beginner': 70,
         'intermediate': 75,
@@ -251,6 +250,112 @@ def validate_quiz_questions(quiz_data, parameters):
 
     return validation
 
+# Validate quiz questions using Anthropic Claude model
+# def validate_with_claude(quiz_data, difficulty):
+#     completion = claude_client.messages.create(
+#         model="claude-3-7-sonnet-20250219",
+#         messages=[{
+#             "role": "user",
+#             "content": f"""You are a quiz validator. Review these quiz questions for {difficulty} level difficulty:
+#             {quiz_data}
+            
+#             Apply these validation criteria:
+#             1. Question clarity and structure
+#             2. Option quality and distinctiveness 
+#             3. Correct answer appropriateness
+#             4. Difficulty level alignment
+#             5. Educational value
+            
+#             For {difficulty} difficulty expectations:
+#             - Beginner: Basic concepts, simple language
+#             - Intermediate: Applied knowledge, moderate complexity
+#             - Expert: Advanced concepts, complex analysis
+            
+#             Provide assessment in the following exact Python dictionary format:
+#             {{
+#                 'score': <0-100>,
+#                 'feedback': [
+#                     {{
+#                         'question_id': <id>,
+#                         'score': <0-100>,
+#                         'difficulty_rating': <'too_easy'|'appropriate'|'too_hard'>,
+#                         'issues': ['issue1', 'issue2'],
+#                         'suggestions': ['suggestion1', 'suggestion2']
+#                     }}
+#                 ],
+#                 'difficulty_alignment': <0-100>,
+#                 'overall_feedback': <summary>
+#             }}
+            
+#             Return only the Python dictionary, nothing else."""
+#         }],
+#         max_tokens=4000,
+#     )
+
+#     generated_text = completion.content
+#     if isinstance(generated_text, list) and len(generated_text) > 0:
+#         generated_text = generated_text[0].text
+
+#     # Parse and clean validation result
+#     start = generated_text.find('{')
+#     end = generated_text.rfind('}') + 1
+#     if start == -1 or end == 0:
+#         raise ValueError("No valid dictionary found in Claude validation response")
+    
+#     validation_result = generated_text[start:end]
+#     validation = eval(validation_result)
+#     return apply_difficulty_threshold(validation, difficulty)
+
+# Validate quiz questions using Google Gemini model
+# def validate_with_gemini(quiz_data, difficulty):
+#     model = genai.GenerativeModel('gemini-1.5-pro')
+
+#     prompt = f"""You are a quiz validator. Review these quiz questions for {difficulty} level difficulty:
+#     {quiz_data}
+    
+#     Apply these validation criteria:
+#     1. Question clarity and structure
+#     2. Option quality and distinctiveness 
+#     3. Correct answer appropriateness
+#     4. Difficulty level alignment
+#     5. Educational value
+    
+#     For {difficulty} difficulty expectations:
+#     - Beginner: Basic concepts, simple language
+#     - Intermediate: Applied knowledge, moderate complexity
+#     - Expert: Advanced concepts, complex analysis
+    
+#     Provide assessment in the following exact Python dictionary format:
+#     {{
+#         'score': <0-100>,
+#         'feedback': [
+#             {{
+#                 'question_id': <id>,
+#                 'score': <0-100>,
+#                 'difficulty_rating': <'too_easy'|'appropriate'|'too_hard'>,
+#                 'issues': ['issue1', 'issue2'],
+#                 'suggestions': ['suggestion1', 'suggestion2']
+#             }}
+#         ],
+#         'difficulty_alignment': <0-100>,
+#         'overall_feedback': <summary>
+#     }}
+    
+#     Return only the Python dictionary, nothing else."""
+    
+#     response = model.generate_content(prompt)
+#     generated_text = response.text
+
+#     # Parse and clean validation result
+#     start = generated_text.find('{')
+#     end = generated_text.rfind('}') + 1
+#     if start == -1 or end == 0:
+#         raise ValueError("No valid dictionary found in Gemini validation response")
+    
+#     validate_result = generated_text[start:end]
+#     validation = eval(validate_result)
+#     return apply_difficulty_threshold(validation, difficulty)
+
 @app.route('/api/validate-quiz', methods=['POST'])
 def validate_quiz():
     try:
@@ -258,17 +363,25 @@ def validate_quiz():
         questions = data.get('questions', [])
         parameters = data.get('parameters', {})
         
+        # Validate the model type to prevent injection
+        if model_type not in ['gpt', 'claude', 'gemini']:
+            model_type = 'gpt'  # Default to GPT if invalid model specified
+            
+        print(f"Validating quiz with {model_type.upper()} model")
+
         validation = validate_quiz_questions({
             'questions': questions,  
             'title': '',  
             'description': ''
-        }, parameters)
+        }, parameters, model_type)
         
         return jsonify({
-            'validation': validation
+            'validation': validation,
+            'model_used': model_type
         })
         
     except Exception as e:
+        print(f"Validation error: {str(e)}")
         return jsonify({
             "error": "Failed to validate quiz",
             "details": str(e)
@@ -383,9 +496,8 @@ def generate_quiz_claude():
                     ]
                 }}"""
             }],
-            max_tokens=20000,
-            temperature=1,
-        )
+            temperature=1, 
+        ) 
         
         # Get the response text from Claude's new response structure
         generated_text = completion.content
@@ -407,7 +519,6 @@ def generate_quiz_claude():
     except Exception as e:
         print(f"Claude API Error: {str(e)}") 
         return jsonify({"error": str(e)}), 400
-
 
 # Generate a quiz using POST method and return the quiz in the response
 @app.route('/api/generate-quiz', methods=['POST'])
@@ -464,7 +575,6 @@ def generate_quiz():
             }
         ],
         model="gpt-3.5-turbo",
-        max_tokens=4000,
     )
 
     generated_text = chat_completion.choices[0].message.content.strip()

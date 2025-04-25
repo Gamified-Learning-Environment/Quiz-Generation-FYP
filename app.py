@@ -714,7 +714,7 @@ def parse_generated_quiz(generated_text):
     quiz_data = eval(dict_text)
     return quiz_data
 
-
+# Extract text from PDF using PyPDF2 and handle both URLs and local file paths
 def extract_text_from_pdf(pdf_path, check_size=True):
     try:
         # Handle both URLs and local file paths
@@ -767,6 +767,7 @@ def extract_text_from_pdf(pdf_path, check_size=True):
         print(f"Error processing PDF: {str(e)}")
         return None
 
+# Upload PDF file to GridFS and return the URL to access it
 @app.route('/api/upload-pdf', methods=['POST'])
 def upload_pdf():
     if 'pdf' not in request.files: # Check if 'pdf' part is in the request

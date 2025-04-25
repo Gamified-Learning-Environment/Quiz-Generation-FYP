@@ -492,6 +492,7 @@ def generate_quiz_claude():
                 }}"""
             }],
             temperature=1, 
+            max_tokens=4000,  
         ) 
         
         # Get the response text from Claude's new response structure

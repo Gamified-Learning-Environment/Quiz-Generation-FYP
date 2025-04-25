@@ -363,21 +363,16 @@ def validate_quiz():
         questions = data.get('questions', [])
         parameters = data.get('parameters', {})
         
-        # Validate the model type to prevent injection
-        if model_type not in ['gpt', 'claude', 'gemini']:
-            model_type = 'gpt'  # Default to GPT if invalid model specified
-            
-        print(f"Validating quiz with {model_type.upper()} model")
+        
 
         validation = validate_quiz_questions({
             'questions': questions,  
             'title': '',  
             'description': ''
-        }, parameters, model_type)
+        }, parameters)
         
         return jsonify({
             'validation': validation,
-            'model_used': model_type
         })
         
     except Exception as e:

@@ -4,55 +4,11 @@ Welcome to the Quiz Generation Microservice Repository for the Gamified Learning
 
 ## Service Overview
 This microservice is designed to provide personalized learning experiences through interactive and highly customizable quizzes. It supports the platform's objective to enhance online learning engagement through intuitive quiz creation and management.
-
-## Features
-
-### Core Quiz Generation Features
-
-1. Dynamic Quiz Generation:
-   - Manual quiz creation interface
-   - AI-powered quiz generation using OpenAI
-   - User-friendly AI prompt engineering system
-   - Customizable quiz parameters and settings
-
-2. Quiz Management:
-   - Quiz object creation and persistence
-   - Session state management
-   - Quiz operation and flow control
-   - Question bank management
-
-3. Data Management:
-   - Quiz data persistence
-   - Integration with results tracking
-   - Dynamic feedback generation
-   - Quiz performance analytics
-
-## Technologies Used
-
-### Backend Framework
-- Flask: Python-based RESTful API development
-- MongoDB: Document-based storage for quiz data
-  - JSON format for quiz structures
-  - Key-value pair storage for efficient retrieval
-- OpenAI Integration: AI-powered quiz generation
-
-## API Endpoints
-
-The service exposes RESTful endpoints for:
-- Quiz creation (manual and AI-generated)
-- Quiz management and retrieval
-- Session state handling
-- Quiz results submission
-- Analytics data access
-
-## System Architecture
-
-### Microservice Integration
-This service is one of four independent microservices in the GLE platform:
-- User Management
-- Quiz Generation (This service)
-- Results Tracking
-- Gamification
+The Quiz Generation microservice is the core for creating quizzes, managing them and delivering them to users. It supports both manual quiz question creation and AI powered generation through the use of APIs. This hopefully makes it flexible in its implementation. It possesses the ability to generate quizzes from either Open AI's Chatgpt, Anthropic's Claude or Google's Gemini, so its never reliant on just one and gives the users options for question generation. 
+   - Quiz Data Model: It has a flexible schema that is designed with support for either multi-choice answers or 1 in 4 answers, difficulty levels and categories of study. All quizzes are stored in MongoDB with IDs for efficient retrieval. Quizzes possess both a QuizID and a UserId of the user that created them.
+   - Manual Quiz Creation: Questions, answers and metadeta can be manually inputted by the user and sent RESTfully to the backend for quiz object creation. This includes image support.
+   - Randomised Question Pools: In the later days of the project, question randomisation was implemented into the question creation process. This allows a quiz creator to have the quiz randomise questions upon an attempt, rather than be in a set sequential order. Additionally, question pools were implemented to complement this. This allows a quiz creator to create a larger pool of questions and have a select amount be pulled from on an attempt, similar to seen on platforms like Moodle.
+   - AI-Powered Generation with Prompt Engineering: Integrates with either OpenAI's ChatGPT, Anthropic's Claude or Google's Gemini for generative AI quiz creation. This is done through several methods that utilize prompt engineering. The prompt varies in approach based on the required AI's API structure with extensive testing on results giving.
 
 ## Deployment and Running
 While you could download, compile and run each of the repositories for this Final Year Project and get a more in depth look into the code, it is also fully deployed on Railway at the following link : https://exper-frontend-production.up.railway.app

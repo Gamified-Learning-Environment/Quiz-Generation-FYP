@@ -86,10 +86,10 @@ Google Gemini (optional)
       2. Environmental Variables
          Create a .env file in each microservice directory with appropriate values:
          ```
-            MONGODB_URI=mongodb://localhost:27017/quizdb
-            OPENAI_API_KEY=your_openai_key
-            ANTHROPIC_API_KEY=your_anthropic_key  # Optional
-            GOOGLE_API_KEY=your_gemini_key  # Optional
+         MONGODB_URI=mongodb://localhost:27017/quizdb
+         OPENAI_API_KEY=your_openai_key
+         ANTHROPIC_API_KEY=your_anthropic_key  # Optional
+         GOOGLE_API_KEY=your_gemini_key  # Optional
          ```
          User Management Service
          ```

@@ -356,6 +356,7 @@ def validate_quiz_questions(quiz_data, parameters):
 #     validation = eval(validate_result)
 #     return apply_difficulty_threshold(validation, difficulty)
 
+# validate quiz questions using POST method and return the validation result in the response
 @app.route('/api/validate-quiz', methods=['POST'])
 def validate_quiz():
     try:
@@ -382,6 +383,7 @@ def validate_quiz():
             "details": str(e)
         }), 400
     
+# Route for Gemini generation
 @app.route('/api/generate-quiz-gemini', methods=['POST'])
 def generate_quiz_gemini():
     data = request.json
@@ -536,7 +538,7 @@ def generate_quiz():
     if question_count > 20:
         return generate_questions_in_batches(notes, pdf_content, parameters, question_count, difficulty)
 
-        # Original code for smaller question counts - Combine notes and PDF content
+    # Combine notes and PDF content
     combined_content = f"{notes}\n{pdf_content}"
 
     chat_completion = client.chat.completions.create(
@@ -688,6 +690,7 @@ def generate_questions_in_batches(notes, pdf_content, parameters, total_question
     
     return combined_quiz
 
+# Parse the generated quiz text to extract the dictionary
 def parse_generated_quiz(generated_text):
 
     # Clean up the response text
@@ -791,6 +794,7 @@ def upload_pdf():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# Serve PDF file from GridFS using the file ID
 @app.route('/pdfs/<file_id>')
 def serve_pdf(file_id):
     try:
@@ -936,6 +940,7 @@ def getCategories():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
+# Add a new category using POST method and return the response
 @app.route('/api/categories', methods=['POST'])
 def addCategory():
     try:
@@ -959,9 +964,11 @@ DEFAULT_CATEGORIES = [
     "Custom"
 ]
 
+# File upload configuration
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# Allowed file extensions for upload
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
     if 'image' not in request.files:
@@ -1009,6 +1016,7 @@ def serve_image(file_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 404
     
+# Health check endpoint
 @app.route('/api/status', methods=['GET'])
 def status():
     return jsonify({
